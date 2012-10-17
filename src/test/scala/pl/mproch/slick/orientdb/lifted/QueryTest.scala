@@ -15,7 +15,7 @@ import OrientDBDriver.simple._
 @RunWith(classOf[JUnitRunner])
 class QueryTest extends FunSpec with MustMatchers with TestPreparer {
 
-  describe("Basic query tests") {
+  describe("Basic tests for lifted embedding") {
     it("Filters and loads Supplier") { db =>
       db withSession {
         val query = for {
