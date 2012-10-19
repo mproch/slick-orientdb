@@ -6,7 +6,6 @@ import org.scalatest.fixture.FunSpec
 import org.scalatest.matchers.MustMatchers
 import pl.mproch.slick.orientdb.TestPreparer
 import slick.session.Database
-import pl.mproch.slick.orientdb.driver.OrientDBDriver
 import scala.slick.direct._
 import scala.slick.direct.AnnotationMapper._
 import Database.{threadLocalSession => session}
@@ -33,6 +32,18 @@ class QueryTest extends FunSpec with MustMatchers with TestPreparer {
         val query = Queryable[Supplier]
 
         backend.result(query.filter(_.name == "Henry").map(_.details),session) must be === List(Details("Important supplier", Address("Popularna","Warsaw")))
+      }
+    }
+
+    it("loads supplier by city") { db =>
+      db withSession {
+        val backend = new OrientSlickBackend(AnnotationMapper )
+
+        val query = Queryable[Supplier]
+
+        val result = backend.result(query.filter(_.details.address.city == "Warsaw").map(_.details),session)
+        result must be === List(Details("Important supplier", Address("Popularna","Warsaw")))
+
       }
     }
 
