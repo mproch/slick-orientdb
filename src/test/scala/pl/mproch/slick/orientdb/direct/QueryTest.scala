@@ -25,6 +25,7 @@ class QueryTest extends FunSpec with MustMatchers with TestPreparer {
 
   describe("Basic tests for direct embedding") {
 
+
     it("loads supplier by name") { db =>
       db withSession {
         val backend = new OrientSlickBackend(AnnotationMapper )
@@ -47,6 +48,19 @@ class QueryTest extends FunSpec with MustMatchers with TestPreparer {
       }
     }
 
+    it("loads complete object") { db =>
+      db withSession {
+
+        val backend = new OrientSlickBackend(AnnotationMapper )
+
+        val query = Queryable[Supplier]
+
+        backend.result(query.filter(_.name == "James"),session).map(_.id) must be === List(13)
+
+
+
+      }
+    }
   }
 
 }

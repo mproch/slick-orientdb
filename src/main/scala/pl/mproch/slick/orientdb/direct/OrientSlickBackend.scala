@@ -14,14 +14,38 @@ import pl.mproch.slick.orientdb.ast.NestedSymbol
 import slick.lifted.TypeMapper.StringTypeMapper
 
 class OrientSlickBackend(mapper: Mapper) extends SlickBackend(OrientDBDriver, mapper) {
-  override protected def resultByType(expectedType: universe.Type, rs: PositionedResult, session: Session) = {
-    expectedType match {
-      case t if t.typeSymbol.asClass.isCaseClass && !mapper.isMapped(t) =>
-        val map = rs.nextObject().asInstanceOf[jmap[String,Object]]
-        caseClassByTypeFromValueMap(expectedType, map)
-      case _ => super.resultByType(expectedType, rs, session)
+
+
+  override protected def resultByType( expectedType : Type, rs: PositionedResult, session:Session) : Any = {
+    def createInstance( args:Seq[Any] ) = {
+      val constructor = expectedType.member( nme.CONSTRUCTOR ).asMethod
+      val cls = cm.reflectClass( cm.classSymbol(cm.runtimeClass(expectedType)) )
+      cls.reflectConstructor( constructor )( args:_* )
     }
+    import TupleTypes.tupleTypes
+    (expectedType match {
+      case t if typeMappers.isDefinedAt(expectedType.toString) => typeMappers( expectedType.toString )(OrientDBDriver).nextValue(rs)
+      case t if tupleTypes.exists( expectedType <:< _ ) =>
+        val typeArgs = expectedType match { case TypeRef(_,_,args_) => args_ }
+        val args = typeArgs.map{
+          tpe => resultByType( tpe, rs, session )
+        }
+        createInstance( args )
+
+      case t if t.typeSymbol.asClass.isCaseClass && !mapper.isMapped(t) =>
+         val map = rs.nextObject().asInstanceOf[jmap[String,Object]]
+         caseClassByTypeFromValueMap(expectedType, map)
+
+      case t if t.typeSymbol.asClass.isCaseClass =>
+        val args = expectedType.member( nme.CONSTRUCTOR ).typeSignature match {
+          case MethodType( params, resultType ) => params.map{ // TODO check that the field order is correct
+            param =>  resultByType( param.typeSignature, rs, session )
+          }
+        }
+        createInstance( args )
+    })
   }
+
 
   protected def caseClassByTypeFromValueMap(expectedType: universe.Type, map:jmap[String,Object]) : Any= {
     def createInstance(args: Seq[Any]) = {
