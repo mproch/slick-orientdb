@@ -6,12 +6,14 @@ import reflect.runtime._
 import scala.reflect.runtime.universe._
 import scala.reflect.runtime.{currentMirror=>cm}
 import java.util.{Map => jmap}
+import java.util.{List => jlist}
 import pl.mproch.slick.orientdb.driver.OrientDBDriver
 import slick.lifted.ConstColumn
 import slick.{SlickException, ast}
 import ast.{FieldSymbol, Library}
 import pl.mproch.slick.orientdb.ast.NestedSymbol
 import slick.lifted.TypeMapper.StringTypeMapper
+import scala.collection.JavaConversions._
 
 class OrientSlickBackend(mapper: Mapper) extends SlickBackend(OrientDBDriver, mapper) {
 
@@ -35,6 +37,16 @@ class OrientSlickBackend(mapper: Mapper) extends SlickBackend(OrientDBDriver, ma
       case t if t.typeSymbol.asClass.isCaseClass && !mapper.isMapped(t) =>
          val map = rs.nextObject().asInstanceOf[jmap[String,Object]]
          caseClassByTypeFromValueMap(expectedType, map)
+
+      //FIXME: do it in some more elegant way ;)
+      case t if (t.typeSymbol.asClass.fullName == "scala.collection.immutable.List") => {
+        val param = t.asInstanceOf[TypeRefApi].args(0)
+        val list = rs.nextObject().asInstanceOf[jlist[Object]]
+        param match {
+          case p if p.typeSymbol.asClass.isCaseClass =>
+            list.map(o=>caseClassByTypeFromValueMap(param, o.asInstanceOf[jmap[String,Object]])).toList
+        }
+      }
 
       case t if t.typeSymbol.asClass.isCaseClass =>
         val args = expectedType.member( nme.CONSTRUCTOR ).typeSignature match {

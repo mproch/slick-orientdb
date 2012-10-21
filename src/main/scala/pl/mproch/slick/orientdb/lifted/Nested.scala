@@ -33,7 +33,6 @@ object Nested {
     }
 
   }
-
 }
 
 abstract class Nested[A <: Product](nameP: String, parent: NNested)

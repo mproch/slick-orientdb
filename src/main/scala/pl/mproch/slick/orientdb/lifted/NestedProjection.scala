@@ -28,5 +28,14 @@ case class NestedProjection3[S1, S2, S3](p1: NestedProperty[S1], p2: NestedPrope
   extends NestedProjection[(S1, S2, S3)] {
   def getResult(map: util.Map[String, Object]) = (p1.getResult(map), p2.getResult(map), p3.getResult(map))
 
+  def <->[S4](pro: NestedProperty[S4]) = NestedProjection4(p1, p2, p3, pro)
+
   def <>[T](f: (S1, S2, S3) => T, g: T => Option[(S1, S2, S3)]) = toProj(t => f(t._1, t._2, t._3), g)
+}
+
+case class NestedProjection4[S1, S2, S3, S4](p1: NestedProperty[S1], p2: NestedProperty[S2], p3: NestedProperty[S3], p4:NestedProperty[S4])
+  extends NestedProjection[(S1, S2, S3, S4)] {
+  def getResult(map: util.Map[String, Object]) = (p1.getResult(map), p2.getResult(map), p3.getResult(map), p4.getResult(map))
+
+  def <>[T](f: (S1, S2, S3, S4) => T, g: T => Option[(S1, S2, S3, S4)]) = toProj(t => f(t._1, t._2, t._3, t._4), g)
 }

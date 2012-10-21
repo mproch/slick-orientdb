@@ -7,6 +7,7 @@ import org.scalatest.matchers.MustMatchers
 import pl.mproch.slick.orientdb.TestPreparer
 import slick.session.Database
 import Nested._
+import NList.nListToColumn
 
 import Database.threadLocalSession
 import pl.mproch.slick.orientdb.driver.OrientDBDriver
@@ -35,6 +36,18 @@ class QueryTest extends FunSpec with MustMatchers with TestPreparer {
         } yield (s.details.address.city)
 
         query.list() must be === List("Tallin")
+      }
+    }
+
+
+    it("Loads trucks") { db =>
+      db withSession {
+        val query = for {
+          s <- Suppliers
+          if (s.name === "Henry")
+        } yield (s)
+
+        query.list().head.trucks must be === List(Truck("aa",2),Truck("bb",3))
       }
     }
   }
@@ -67,12 +80,22 @@ object Suppliers extends Document[Supplier]("SUPPLIERS") {
     }
   }
 
-  def * = id ~ name ~ details <>(Supplier, Supplier.unapply _)
+  def trucks = {
+    val s = this
+    new NList[Truck]("trucks",s) {
+      def number = ncolumn[String]("number")
+      def capacity = ncolumn[Double]("capacity")
+      def * = number <-> capacity <> (Truck.apply _, Truck.unapply _)
+    }
+  }
+
+  def * = id ~ name ~ details ~ trucks <>(Supplier, Supplier.unapply _)
 }
 
 case class Details(description: String, address: Address)
 
 case class Address(city: String, street: String)
 
-case class Supplier(id: Int, name: String, details: Details)
+case class Supplier(id: Int, name: String, details: Details, trucks:List[Truck])
 
+case class Truck(number:String, capacity:Double)

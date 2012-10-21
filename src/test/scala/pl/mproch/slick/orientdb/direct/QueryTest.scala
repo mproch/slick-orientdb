@@ -56,11 +56,20 @@ class QueryTest extends FunSpec with MustMatchers with TestPreparer {
         val query = Queryable[Supplier]
 
         backend.result(query.filter(_.name == "James"),session).map(_.id) must be === List(13)
-
-
-
       }
     }
+
+    it("loads trucks") { db =>
+      db withSession {
+
+        val backend = new OrientSlickBackend(AnnotationMapper )
+
+        val query = Queryable[Supplier]
+
+        backend.result(query.filter(_.name == "Henry"),session).head.trucks must be === List(Truck("aa",2.0), Truck("bb",3.0))
+      }
+    }
+
   }
 
 }
@@ -68,7 +77,10 @@ class QueryTest extends FunSpec with MustMatchers with TestPreparer {
 @table("suppliers")
 case class Supplier(@column("id") id:Int,
                      @column("name") name:String,
-                     @column("details") details:Details)
+                     @column("details") details:Details,
+                     @column("trucks") trucks:List[Truck])
+
+case class Truck(@column("number") number:String, @column("capacity") capacity:Double)
 
 case class Details(@column("description") description:String,
                    @column("address") address : Address)
