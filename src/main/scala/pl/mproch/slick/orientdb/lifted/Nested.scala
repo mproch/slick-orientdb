@@ -19,8 +19,10 @@ object Nested {
 
   }
 
-  def nestedShape[A<:Product]: Shape[Nested[A], A, Nested[A]] = new IdentityShape[Nested[A], A] {
+  def nestedShape[A<:Product]: Shape[Nested[A], A, Column[A]] = new Shape[Nested[A], A, Column[A]] {
     def linearizer(from: Mixed) = nestedToColumn(from)
+    def packedShape = Shape.selfLinearizingShape.asInstanceOf[Shape[Packed,Unpacked,Packed]]
+    def pack(from: Mixed): Packed = nestedToColumn(from)
     def buildPacked(f: NaturalTransformation2[TypeMapper, ({ type L[X] = Unpacked => X })#L, Column]) = impureShape
   }
 

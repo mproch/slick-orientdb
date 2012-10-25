@@ -43,21 +43,21 @@ class QueryTest extends FunSpec with MustMatchers with TestPreparer {
 
     }
 
-                                   /*
+
     it("Projects on nested elements") { db =>
 
       //TODO: nestedShape should be val not def :|
-      implicit val shape = Nested.nestedShape[Address]
+      implicit val shape = Nested.nestedShape[Details]
 
       db withSession {
         val query = for {
           s <- Suppliers
           if (s.name === "James")
-        } yield (s.details.address)
+        } yield (s.details)
 
-        query.list() must be === List(Address("Tallin","Narva"))
+        query.list().map(_.address) must be === List(Address("Tallin","Narva"))
       }
-    }                                */
+    }
 
     it("Loads trucks") { db =>
       db withSession {
