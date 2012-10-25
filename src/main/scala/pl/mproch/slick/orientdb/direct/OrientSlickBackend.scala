@@ -10,10 +10,12 @@ import java.util.{List => jlist}
 import pl.mproch.slick.orientdb.driver.OrientDBDriver
 import slick.lifted.ConstColumn
 import slick.{SlickException, ast}
-import ast.{FieldSymbol, Library}
-import pl.mproch.slick.orientdb.ast.NestedSymbol
+import ast.{Node, FieldSymbol, Library}
+import pl.mproch.slick.orientdb.ast.{OrientDBLibrary, NestedSymbol}
 import slick.lifted.TypeMapper.StringTypeMapper
 import scala.collection.JavaConversions._
+import reflect.api.Trees
+import java.util
 
 class OrientSlickBackend(mapper: Mapper) extends SlickBackend(OrientDBDriver, mapper) {
 
@@ -127,10 +129,8 @@ class OrientSlickBackend(mapper: Mapper) extends SlickBackend(OrientDBDriver, ma
         =>
           extractColumn( getConstructorArgs( from.tpe.widen ).filter(_.name==name).head, scope(from.symbol) )
         */
-        case Select(from,name) if isNestedColumn(tree)
-                =>
-          extractNestedColumn(tree,scope)
-          //extractColumn( getConstructorArgs( from.tpe.widen ).filter(_.name==name).head, scope(from.symbol) )
+        case Select(from,name) if isNestedColumn(tree) =>
+          new Query(extractNestedColumn(tree,scope),scope)
 
 /*
         // TODO: Where is this needed?
@@ -227,35 +227,62 @@ class OrientSlickBackend(mapper: Mapper) extends SlickBackend(OrientDBDriver, ma
   private def isNestedColumn(tree:Tree) : Boolean = {
     tree match {
       case Select(from,name) if mapper.isMapped( from.tpe.widen ) => true
-      case Select(a@Select(_,_),_) => isNestedColumn(a)
+      case Select(a,_) => isNestedColumn(a)
+      case Apply(Select(a,name),arg::Nil) if (name.encoded == "filter") => isNestedColumn(a)
       case _ => false
     }
   }
 
-  private def extractNestedColumn(tree:Tree, scope:Scope, pathN:List[String]=List()) : Query=  {
-    implicit def node2Query(node:sq.Node) = new Query( node, scope )
+  private def extractNestedColumn(tree:Tree, scope:Scope, pathN:List[Either[Symbol,String]]=List()) : Node=  {
 
     tree match {
       case Select(from,name) if mapper.isMapped( from.tpe.widen ) => {
 
-        val column = getConstructorArgs( from.tpe.widen ).filter(_.name==name).head
+        val column = findColumn(from,name)
 
-        val columnName = mapper.fieldToColumn( column )
-
-        val finalname::finalpath = (columnName::pathN).reverse
-
-        scala.slick.ast.Select(scope(from.symbol), new FieldSymbol(finalname)(List(), StringTypeMapper) with NestedSymbol {
-              val path = finalpath.reverse
-        })
+        createColumnFromPath(Left(column)::pathN, from,scope)
       }
-      case Select(a@Select(_,_),name) => {
-        val column = getConstructorArgs( a.tpe.widen ).filter(_.name==name).head
+      case Select(a,name) if (tree.symbol.isMethod && zeroOperatorMethods.containsKey(name.encoded)) => {
+        val method = zeroOperatorMethods(name.encoded)
+        method.apply(extractNestedColumn(a, scope, pathN))
+      }
+      case Apply(Select(a,name),arg::Nil) if (name.encoded == "filter") =>  {
+        //this is v. provisoric...
+        val Function(param::Nil,body) = arg
+        val filter = parseFilter(body, param.symbol)
 
-        val columnName = mapper.fieldToColumn( column )
-        extractNestedColumn(a, scope, columnName::pathN)
+        extractNestedColumn(a, scope,Right("["+filter+"]")::pathN)
+      }
+
+      case Select(a,name) => {
+        extractNestedColumn(a, scope, Left(findColumn(a,name))::pathN)
       }
     }
   }
 
+  private def findColumn(from:TreeApi, name:Name) = getConstructorArgs( from.tpe.widen ).filter(_.name==name).head
+
+  val zeroOperatorMethods = Map("size"->OrientDBLibrary.Size,"length"->OrientDBLibrary.Size)
+
+  private def createColumnFromPath(path: List[Either[Symbol,String]],from:TreeApi,scope:Scope) = {
+    val finalname::finalpath = path.reverse.map(e=>e.fold(mapper.fieldToColumn,identity))
+            scala.slick.ast.Select(scope(from.symbol), new FieldSymbol(finalname)(List(), StringTypeMapper) with NestedSymbol {
+                  val path = finalpath.reverse
+    })
+  }
+
+  private def parseFilter(body:TreeApi, paramName:Symbol) : String = body match {
+    case Apply(Select(a,name),arg::Nil) => {
+      val Literal(Constant(value)) = arg
+      parseNestedSelect(a, paramName, List()).reduce(_+"."+_)+" = "+value
+    }
+  }
+
+  private def parseNestedSelect(body:TreeApi, paramName:Symbol, acc:List[String]) : List[String] = body match {
+    case Select(a,name) => {
+      (mapper.fieldToColumn(findColumn(a,name)))::acc
+    }
+    case a if (a == paramName) => acc
+  }
 
 }

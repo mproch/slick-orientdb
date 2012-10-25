@@ -12,12 +12,14 @@ import NList.nListToColumn
 import Database.threadLocalSession
 import pl.mproch.slick.orientdb.driver.OrientDBDriver
 import OrientDBDriver.simple._
+import slick.lifted.{ShapeLowPriority, Shape}
 
 @RunWith(classOf[JUnitRunner])
 class QueryTest extends FunSpec with MustMatchers with TestPreparer {
 
   describe("Basic tests for lifted embedding") {
     it("Filters and loads Supplier") { db =>
+
       db withSession {
         val query = for {
           s <- Suppliers
@@ -26,19 +28,36 @@ class QueryTest extends FunSpec with MustMatchers with TestPreparer {
 
         query.list().map(_.id) must be === List(12)
       }
+
     }
 
     it("Filters and loads cities") { db =>
+
       db withSession {
         val query = for {
           s <- Suppliers
           if (s.name === "James")
         } yield (s.details.address.city)
-
         query.list() must be === List("Tallin")
       }
+
     }
 
+                                   /*
+    it("Projects on nested elements") { db =>
+
+      //TODO: nestedShape should be val not def :|
+      implicit val shape = Nested.nestedShape[Address]
+
+      db withSession {
+        val query = for {
+          s <- Suppliers
+          if (s.name === "James")
+        } yield (s.details.address)
+
+        query.list() must be === List(Address("Tallin","Narva"))
+      }
+    }                                */
 
     it("Loads trucks") { db =>
       db withSession {
@@ -66,6 +85,7 @@ object Suppliers extends Document[Supplier]("SUPPLIERS") {
 
   def id = column[Int]("id")
   def name = column[String]("name")
+
   def details = {
     val s = this
     new Nested[Details]("details", s) {
@@ -76,6 +96,7 @@ object Suppliers extends Document[Supplier]("SUPPLIERS") {
         def street = ncolumn[String]("street")
         def * = city <-> street <>(Address, Address.unapply _)
       }
+
       def * = description <-> address <>(Details.apply _, Details.unapply _)
     }
   }
@@ -96,6 +117,7 @@ case class Details(description: String, address: Address)
 
 case class Address(city: String, street: String)
 
-case class Supplier(id: Int, name: String, details: Details, trucks:List[Truck])
+case class Supplier(id: Int, name: String,
+                    details: Details, trucks:List[Truck])
 
 case class Truck(number:String, capacity:Double)

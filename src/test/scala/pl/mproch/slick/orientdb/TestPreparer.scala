@@ -9,6 +9,7 @@ trait TestPreparer {
 
   def prepareDatabase(name:String) {
     OGlobalConfiguration.STORAGE_KEEP_OPEN.setValue(true)
+
     val tx = new ODatabaseDocumentTx("memory:"+name)
 
     tx.create[ODatabaseDocument]()
@@ -37,6 +38,7 @@ trait TestPreparer {
 
 
     tx.close()
+
 
   }
 

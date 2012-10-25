@@ -16,6 +16,8 @@ class QueryTest extends FunSpec with MustMatchers with TestPreparer {
 
   type FixtureParam = Database
 
+  val backend = new OrientSlickBackend(AnnotationMapper )
+
   protected def withFixture(test: OneArgTest) {
     prepareDatabase(test.name)
     test(Database.forURL("jdbc:orient:memory:"+test.name,
@@ -28,18 +30,19 @@ class QueryTest extends FunSpec with MustMatchers with TestPreparer {
 
     it("loads supplier by name") { db =>
       db withSession {
-        val backend = new OrientSlickBackend(AnnotationMapper )
-
         val query = Queryable[Supplier]
 
-        backend.result(query.filter(_.name == "Henry").map(_.details),session) must be === List(Details("Important supplier", Address("Popularna","Warsaw")))
+        val details = backend.result(
+          query.filter(_.name == "Henry")
+          .map(_.details),session)
+
+        details must be ===
+          List(Details("Important supplier", Address("Popularna","Warsaw")))
       }
     }
 
     it("loads supplier by city") { db =>
       db withSession {
-        val backend = new OrientSlickBackend(AnnotationMapper )
-
         val query = Queryable[Supplier]
 
         val result = backend.result(query.filter(_.details.address.city == "Warsaw").map(_.details),session)
@@ -51,8 +54,6 @@ class QueryTest extends FunSpec with MustMatchers with TestPreparer {
     it("loads complete object") { db =>
       db withSession {
 
-        val backend = new OrientSlickBackend(AnnotationMapper )
-
         val query = Queryable[Supplier]
 
         backend.result(query.filter(_.name == "James"),session).map(_.id) must be === List(13)
@@ -62,12 +63,38 @@ class QueryTest extends FunSpec with MustMatchers with TestPreparer {
     it("loads trucks") { db =>
       db withSession {
 
-        val backend = new OrientSlickBackend(AnnotationMapper )
-
         val query = Queryable[Supplier]
 
-        backend.result(query.filter(_.name == "Henry"),session).head.trucks must be === List(Truck("aa",2.0), Truck("bb",3.0))
+        backend.result(query.filter(_.name == "Henry"),session)
+          .head.trucks must be === List(Truck("aa",2.0), Truck("bb",3.0))
       }
+    }
+
+    it("filters by capacity") { db =>
+      db withSession {
+        val suppliers = Queryable[Supplier]
+
+        val query = for {
+         supplier <-  suppliers
+        } yield (supplier.trucks.size)
+
+        backend.result(query, session) must be === List(2,0)
+      }
+
+    }
+
+    it("filters by one truck number") { db =>
+      db withSession {
+        val suppliers = Queryable[Supplier]
+
+        val query = for {
+         supplier <-  suppliers
+         if (supplier.trucks.filter(_.number == "aa").size > 0)
+        } yield (supplier.name)
+
+        backend.result(query, session) must be === List("Henry")
+      }
+
     }
 
   }
@@ -80,7 +107,9 @@ case class Supplier(@column("id") id:Int,
                      @column("details") details:Details,
                      @column("trucks") trucks:List[Truck])
 
-case class Truck(@column("number") number:String, @column("capacity") capacity:Double)
+
+case class Truck(@column("number") number:String,
+                 @column("capacity") capacity:Double)
 
 case class Details(@column("description") description:String,
                    @column("address") address : Address)

@@ -1,8 +1,9 @@
 package pl.mproch.slick.orientdb.driver
 
 import slick.driver.{QueryBuilderInput, BasicDriver}
-import slick.ast.{Path, Node, Symbol}
-import pl.mproch.slick.orientdb.ast.NestedSymbol
+import slick.ast.{Library, Path, Node, Symbol}
+import pl.mproch.slick.orientdb.ast.{OrientDBLibrary, NestedSymbol}
+import scala.slick.util.MacroSupport.macroSupportInterpolation
 
 trait OrientDBDriver extends BasicDriver {
   driver =>
@@ -15,11 +16,14 @@ trait OrientDBDriver extends BasicDriver {
     override def expr(n: Node, skipParens: Boolean) = n match {
       case Path(field :: (rest@(_ :: _))) =>
         b += encodeSymbol(field)
+      case OrientDBLibrary.Size(path) => b"$path.size()"
+
+
       case _ => super.expr(n, skipParens)
     }
 
     def encodeSymbol(symbol : Symbol) = symbol match {
-      case e:NestedSymbol => (symbolName(symbol)::(e.path.reverse)).reverse.reduce(_+"."+_)
+      case e:NestedSymbol => (symbolName(symbol)::(e.path.reverse)).reverse.reduce(_+"."+_).replaceAll("\\.\\[","[")
       case _ => symbolName(symbol)
     }
 
